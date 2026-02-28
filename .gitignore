@@ -31,3 +31,5 @@ python/tests/data/
 # Added by cargo
 
 /target
+
+python/site

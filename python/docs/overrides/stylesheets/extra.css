@@ -1,0 +1,16 @@
+:root,
+[data-md-color-scheme="default"] {
+  --md-default-fg-color: #443f3f;
+  --boxShadowD: 0px 12px 24px 0px rgba(68, 63, 63, 0.08),
+    0px 0px 4px 0px rgba(68, 63, 63, 0.08);
+}
+.md-typeset h1,
+.md-typeset h2 {
+  font-weight: normal;
+  color: var(--md-default-fg-color);
+}
+.md-typeset h3,
+.md-typeset h4 {
+  font-weight: bold;
+  color: var(--md-default-fg-color);
+}

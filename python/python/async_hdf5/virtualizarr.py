@@ -54,35 +54,29 @@ async def open_virtual_hdf5(
     Uses async-hdf5 (a Rust HDF5 binary parser) for metadata extraction and
     VirtualiZarr's ManifestStore for lazy chunk reads via obstore.
 
-    Parameters
-    ----------
-    path
-        Path to the HDF5 file within the store (e.g. the filename portion of
-        an S3 URL).
-    store
-        An obstore ``ObjectStore`` instance or obspec-compatible backend.
-    group
-        HDF5 group to open (e.g. ``"science/LSAR/GCOV/grids/frequencyA"``).
-        If *None*, the root group is used.
-    url
-        Full URL of the HDF5 file (e.g. ``"s3://bucket/path/file.h5"``).
-        Stored in chunk manifests so ManifestStore can resolve the correct
-        store via the registry.  If *None*, *path* is used as-is.
-    registry
-        An :class:`ObjectStoreRegistry` mapping URL prefixes to store
-        instances.  If *None*, one is created automatically and the provided
-        *store* is registered under the scheme/netloc of *url*.
-    drop_variables
-        Variable names to exclude from the virtual dataset.
-    block_size
-        Block cache size in bytes.  Each unique region of the file accessed
-        during metadata parsing triggers a fetch of the aligned block
-        containing that region.  Default 8 MiB.
+    Args:
+        path: Path to the HDF5 file within the store (e.g. the filename
+            portion of an S3 URL).
+        store: An obstore ``ObjectStore`` instance or obspec-compatible
+            backend.
+        group: HDF5 group to open (e.g.
+            ``"science/LSAR/GCOV/grids/frequencyA"``). If ``None``, the
+            root group is used.
+        url: Full URL of the HDF5 file (e.g.
+            ``"s3://bucket/path/file.h5"``). Stored in chunk manifests so
+            ManifestStore can resolve the correct store via the registry.
+            If ``None``, *path* is used as-is.
+        registry: An :class:`ObjectStoreRegistry` mapping URL prefixes to
+            store instances. If ``None``, one is created automatically and
+            the provided *store* is registered under the scheme/netloc of
+            *url*.
+        drop_variables: Variable names to exclude from the virtual dataset.
+        block_size: Block cache size in bytes. Each unique region of the file
+            accessed during metadata parsing triggers a fetch of the aligned
+            block containing that region. Default 8 MiB.
 
-    Returns
-    -------
-    xr.Dataset
-        An xarray Dataset backed by a ManifestStore (zarr v3).  Variables are
+    Returns:
+        An xarray Dataset backed by a ManifestStore (zarr v3). Variables are
         lazily loaded — indexing or calling ``.load()`` triggers byte-range
         reads from the object store.
     """

@@ -73,23 +73,18 @@ def _parse_chunk_key(suffix: str, separator: str = ".") -> tuple[int, ...]:
 def _decode_fill_value(raw: list[int] | None, numpy_dtype: str) -> int | float | None:
     """Convert raw fill value bytes from the HDF5 parser to a numpy scalar.
 
-    Parameters
-    ----------
-    raw
-        Raw fill value as a list of byte values (from Rust ``Vec<u8>`` via PyO3),
-        or *None* if no fill value is defined.
-    numpy_dtype
-        Numpy dtype string for the dataset (e.g. ``"<f4"``).
+    Args:
+        raw: Raw fill value as a list of byte values (from Rust ``Vec<u8>``
+            via PyO3), or ``None`` if no fill value is defined.
+        numpy_dtype: Numpy dtype string for the dataset (e.g. ``"<f4"``).
 
-    Returns
-    -------
-    int | float | None
-        A Python scalar suitable for Zarr's ``ArrayV3Metadata(fill_value=...)``.
+    Returns:
+        A Python scalar suitable for Zarr's ``ArrayV3Metadata(fill_value=...)``,
+        or ``None`` if no fill value is defined.
 
-    Raises
-    ------
-    ValueError
-        If *raw* cannot be interpreted as *numpy_dtype* (e.g. byte count mismatch).
+    Raises:
+        ValueError: If *raw* cannot be interpreted as *numpy_dtype*
+            (e.g. byte count mismatch).
     """
     if raw is None:
         return None
@@ -393,24 +388,20 @@ class _ChunkBatcher:
 
 
 class LazyHDF5Store(Store):
-    """
-    Read-only Zarr v3 store backed by async-hdf5 with lazy chunk index resolution.
+    """Read-only Zarr v3 store backed by async-hdf5 with lazy chunk index resolution.
 
     Dataset metadata (shape, dtype, codecs, etc.) is parsed eagerly at
     construction — this is fast because the data is already in async-hdf5's
     BlockCache from the superblock / group parse.  Chunk indices (B-tree /
     FixedArray traversal) are parsed lazily on first chunk access per variable.
 
-    Parameters
-    ----------
-    dataset_infos
-        Mapping from variable name to ``_DatasetInfo`` (pre-parsed metadata).
-    group_attrs
-        Root group attributes.
-    file_url
-        Full URL of the HDF5 file for byte-range routing.
-    registry
-        ObjectStoreRegistry mapping URL prefixes to ObjectStore instances.
+    Args:
+        dataset_infos: Mapping from variable name to ``_DatasetInfo``
+            (pre-parsed metadata).
+        group_attrs: Root group attributes.
+        file_url: Full URL of the HDF5 file for byte-range routing.
+        registry: ObjectStoreRegistry mapping URL prefixes to ObjectStore
+            instances.
     """
 
     _dataset_infos: dict[str, _DatasetInfo]
@@ -700,35 +691,26 @@ async def open_lazy_hdf5(
     index parsing until data is actually accessed.  This makes the initial
     ``open_dataset`` call significantly faster for files with many variables.
 
-    Parameters
-    ----------
-    path
-        Path within the store (e.g. the object key for S3).
-    store
-        An obstore ObjectStore or obspec-compatible backend.
-    group
-        HDF5 group to open.  If *None*, the root group is used.
-    url
-        Full URL of the HDF5 file.  Stored in chunk references so the store
-        can route reads to the correct ObjectStore.  If *None*, *path* is used.
-    registry
-        ObjectStoreRegistry mapping URL prefixes to store instances.
-    drop_variables
-        Variable names to exclude.
-    block_size
-        BlockCache size in bytes (default 8 MiB).
-    pre_warm_threshold
-        Maximum bytes of cache blocks to pre-fetch in parallel during open
-        (default ``None`` — disabled).  When set, the file size is queried
-        and up to *threshold* bytes of blocks are fetched in a single
-        batched call.  This trades bandwidth for latency: useful on very
-        fast connections or for small files, but counterproductive when
-        the file is large relative to the connection speed.
+    Args:
+        path: Path within the store (e.g. the object key for S3).
+        store: An obstore ObjectStore or obspec-compatible backend.
+        group: HDF5 group to open. If ``None``, the root group is used.
+        url: Full URL of the HDF5 file. Stored in chunk references so the
+            store can route reads to the correct ObjectStore. If ``None``,
+            *path* is used.
+        registry: ObjectStoreRegistry mapping URL prefixes to store instances.
+        drop_variables: Variable names to exclude.
+        block_size: BlockCache size in bytes (default 8 MiB).
+        pre_warm_threshold: Maximum bytes of cache blocks to pre-fetch in
+            parallel during open (default ``None`` — disabled). When set,
+            the file size is queried and up to *threshold* bytes of blocks
+            are fetched in a single batched call. This trades bandwidth for
+            latency: useful on very fast connections or for small files, but
+            counterproductive when the file is large relative to the
+            connection speed.
 
-    Returns
-    -------
-    xr.Dataset
-        An xarray Dataset backed by a LazyHDF5Store.  Variables are lazily
+    Returns:
+        An xarray Dataset backed by a LazyHDF5Store. Variables are lazily
         loaded — chunk indices are only parsed when data is actually read.
     """
     import xarray as xr
