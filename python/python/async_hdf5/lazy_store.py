@@ -19,7 +19,6 @@ import re
 import warnings
 from collections.abc import AsyncGenerator, Iterable
 from typing import TYPE_CHECKING, Any, Literal
-from urllib.parse import urlparse
 
 import numpy as np
 from zarr.abc.store import (
@@ -39,8 +38,6 @@ from async_hdf5 import HDF5Dataset, HDF5File
 
 if TYPE_CHECKING:
     import asyncio
-
-    from obspec_utils.registry import ObjectStoreRegistry
 
     from async_hdf5 import ChunkIndex
 
@@ -399,15 +396,12 @@ class LazyHDF5Store(Store):
         dataset_infos: Mapping from variable name to ``_DatasetInfo``
             (pre-parsed metadata).
         group_attrs: Root group attributes.
-        file_url: Full URL of the HDF5 file for byte-range routing.
-        registry: ObjectStoreRegistry mapping URL prefixes to ObjectStore
-            instances.
+        file_url: Full URL of the HDF5 file (used for equality checks).
     """
 
     _dataset_infos: dict[str, _DatasetInfo]
     _group_attrs: dict[str, Any]
     _file_url: str
-    _registry: ObjectStoreRegistry
     _chunk_indices: dict[str, ChunkIndex]
     _batchers: dict[str, _ChunkBatcher]
     _group_metadata: GroupMetadata
@@ -418,13 +412,11 @@ class LazyHDF5Store(Store):
         dataset_infos: dict[str, _DatasetInfo],
         group_attrs: dict[str, Any],
         file_url: str,
-        registry: ObjectStoreRegistry,
     ) -> None:
         super().__init__(read_only=True)
         self._dataset_infos = dataset_infos
         self._group_attrs = group_attrs
         self._file_url = file_url
-        self._registry = registry
         self._chunk_indices = {}
         self._batchers = {}
         self._group_metadata = GroupMetadata(attributes=_sanitize_attrs(group_attrs))
@@ -675,15 +667,13 @@ def _transform_byte_range(
 
 
 async def open_lazy_hdf5(
-    path: str,
     *,
+    path: str,
     store: Any,
     group: str | None = None,
-    url: str | None = None,
-    registry: ObjectStoreRegistry | None = None,
     drop_variables: Iterable[str] | None = None,
     block_size: int = 8 * 1024 * 1024,
-    pre_warm_threshold: int | None = None,
+    pre_warm_size: int | None = None,
 ) -> Any:
     """Open an HDF5 file as a lazy xarray Dataset.
 
@@ -695,15 +685,11 @@ async def open_lazy_hdf5(
         path: Path within the store (e.g. the object key for S3).
         store: An obstore ObjectStore or obspec-compatible backend.
         group: HDF5 group to open. If ``None``, the root group is used.
-        url: Full URL of the HDF5 file. Stored in chunk references so the
-            store can route reads to the correct ObjectStore. If ``None``,
-            *path* is used.
-        registry: ObjectStoreRegistry mapping URL prefixes to store instances.
         drop_variables: Variable names to exclude.
         block_size: BlockCache size in bytes (default 8 MiB).
-        pre_warm_threshold: Maximum bytes of cache blocks to pre-fetch in
+        pre_warm_size: Maximum bytes of cache blocks to pre-fetch in
             parallel during open (default ``None`` — disabled). When set,
-            the file size is queried and up to *threshold* bytes of blocks
+            the file size is queried and up to *pre_warm_size* bytes of blocks
             are fetched in a single batched call. This trades bandwidth for
             latency: useful on very fast connections or for small files, but
             counterproductive when the file is large relative to the
@@ -714,16 +700,14 @@ async def open_lazy_hdf5(
         loaded — chunk indices are only parsed when data is actually read.
     """
     import xarray as xr
-    from obspec_utils.registry import ObjectStoreRegistry as Registry
 
     # Phase 1: parse superblock + group structure
     f = await HDF5File.open(
-        path, store=store, block_size=block_size, pre_warm_threshold=pre_warm_threshold
+        path, store=store, block_size=block_size, pre_warm_size=pre_warm_size
     )
     root = await f.root_group()
     target = (await root.navigate(group)) if group else root
 
-    file_url = url or path
     drop = set(drop_variables or ())
 
     # Phase 2: parse all dataset headers (fast — data in BlockCache)
@@ -758,32 +742,11 @@ async def open_lazy_hdf5(
     # Get group attributes
     group_attrs = await target.attributes()
 
-    # Set up registry
-    if registry is None:
-        registry = Registry()
-    _ensure_store_registered(registry, file_url, store)
-
     # Create lazy store
     lazy_store = LazyHDF5Store(
         dataset_infos=dataset_infos,
         group_attrs=group_attrs,
-        file_url=file_url,
-        registry=registry,
+        file_url=path,
     )
 
     return xr.open_dataset(lazy_store, engine="zarr", consolidated=False, zarr_format=3)
-
-
-def _ensure_store_registered(
-    registry: ObjectStoreRegistry,
-    file_url: str,
-    store: Any,
-) -> None:
-    """Register *store* in *registry* for the scheme://netloc prefix of *file_url*."""
-    parsed = urlparse(file_url)
-    if parsed.scheme and parsed.netloc:
-        prefix = f"{parsed.scheme}://{parsed.netloc}"
-        try:
-            registry.resolve(file_url)
-        except Exception:
-            registry.register(prefix, store)
