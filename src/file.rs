@@ -6,7 +6,7 @@ use crate::endian::HDF5Reader;
 use crate::error::Result;
 use crate::group::HDF5Group;
 use crate::object_header::ObjectHeader;
-use crate::reader::{AsyncFileReader, ReadaheadCache};
+use crate::reader::{AsyncFileReader, BlockCache};
 use crate::superblock::Superblock;
 
 /// An opened HDF5 file.
@@ -33,23 +33,20 @@ pub struct HDF5File {
 impl HDF5File {
     /// Open an HDF5 file by parsing its superblock.
     ///
-    /// Wraps the given reader in a `ReadaheadCache` to avoid many small
-    /// network requests during metadata parsing.
+    /// Wraps the given reader in a `BlockCache` (default 8 MiB blocks) to
+    /// coalesce the many small metadata reads into a few large requests.
     pub async fn open(reader: impl AsyncFileReader) -> Result<Self> {
-        Self::open_with_options(reader, 64 * 1024, 2.0).await
+        Self::open_with_block_size(reader, 8 * 1024 * 1024).await
     }
 
-    /// Open with configurable prefetch parameters.
-    pub async fn open_with_options(
+    /// Open with a configurable block cache size.
+    pub async fn open_with_block_size(
         reader: impl AsyncFileReader,
-        initial_prefetch: u64,
-        multiplier: f64,
+        block_size: u64,
     ) -> Result<Self> {
-        let cached = ReadaheadCache::new(reader)
-            .with_initial_size(initial_prefetch)
-            .with_multiplier(multiplier);
+        let cached = BlockCache::new(reader).with_block_size(block_size);
 
-        let initial_bytes = cached.get_bytes(0..initial_prefetch).await?;
+        let initial_bytes = cached.get_bytes(0..block_size.min(64 * 1024)).await?;
         let (superblock, _offset) = Superblock::parse(&initial_bytes)?;
 
         Ok(Self {
@@ -58,7 +55,7 @@ impl HDF5File {
         })
     }
 
-    /// Open with an already-configured reader (e.g., a pre-built ReadaheadCache).
+    /// Open with an already-configured reader (e.g., a pre-built `BlockCache`).
     pub async fn open_raw(reader: Arc<dyn AsyncFileReader>) -> Result<Self> {
         let initial_bytes = reader.get_bytes(0..64 * 1024).await?;
         let (superblock, _offset) = Superblock::parse(&initial_bytes)?;

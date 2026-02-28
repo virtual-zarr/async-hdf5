@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Range;
 use std::sync::Arc;
@@ -122,7 +123,7 @@ impl<T: tokio::io::AsyncRead + tokio::io::AsyncSeek + Unpin + Send + Debug + 'st
         let mut buffer = vec![0u8; to_read];
 
         // Use read_buf loop instead of read_exact to handle EOF gracefully.
-        // The ReadaheadCache may request ranges past the end of the file.
+        // The BlockCache may request ranges past the end of the file.
         let mut total_read = 0;
         while total_read < to_read {
             let n = file.read(&mut buffer[total_read..]).await?;
@@ -171,99 +172,39 @@ impl AsyncFileReader for ReqwestReader {
     }
 }
 
-// ── ReadaheadCache ──────────────────────────────────────────────────────────
+// ── BlockCache ──────────────────────────────────────────────────────────────
 
-/// Sequential block cache that stores contiguous data from the start of a file.
-#[derive(Debug)]
-struct SequentialBlockCache {
-    buffers: Vec<Bytes>,
-    len: u64,
-}
-
-impl SequentialBlockCache {
-    fn new() -> Self {
-        Self {
-            buffers: vec![],
-            len: 0,
-        }
-    }
-
-    fn contains(&self, range: &Range<u64>) -> bool {
-        range.end <= self.len
-    }
-
-    fn slice(&self, range: Range<u64>) -> Bytes {
-        let out_len = (range.end - range.start) as usize;
-        let mut remaining = range;
-        let mut out_buffers: Vec<Bytes> = vec![];
-
-        for buf in &self.buffers {
-            let current_buf_len = buf.len() as u64;
-
-            if remaining.start >= current_buf_len {
-                remaining.start -= current_buf_len;
-                remaining.end -= current_buf_len;
-                continue;
-            }
-
-            let start = remaining.start as usize;
-            let length =
-                (remaining.end - remaining.start).min(current_buf_len - remaining.start) as usize;
-            let end = start + length;
-
-            if start == end {
-                continue;
-            }
-
-            out_buffers.push(buf.slice(start..end));
-
-            remaining.start = 0;
-            if remaining.end <= current_buf_len {
-                break;
-            }
-            remaining.end -= current_buf_len;
-        }
-
-        if out_buffers.len() == 1 {
-            out_buffers.into_iter().next().unwrap()
-        } else {
-            let mut out = BytesMut::with_capacity(out_len);
-            for b in out_buffers {
-                out.extend_from_slice(&b);
-            }
-            out.into()
-        }
-    }
-
-    fn append(&mut self, buffer: Bytes) {
-        self.len += buffer.len() as u64;
-        self.buffers.push(buffer);
-    }
-}
-
-/// A caching wrapper that prefetches data sequentially from the start of a file
-/// in exponentially growing chunks.
+/// A caching wrapper that fetches fixed-size aligned blocks around each
+/// accessed offset.
 ///
-/// Modeled after async-tiff's `ReadaheadMetadataCache`. This should **always** be
-/// used when reading metadata to avoid translating the many small internal reads
-/// into individual tiny network requests.
+/// Unlike a sequential readahead cache, a block cache handles the scattered
+/// access patterns of HDF5 metadata efficiently: the superblock is at offset 0,
+/// object headers and B-tree nodes are scattered across the file, and a
+/// sequential cache would waste bandwidth fetching unneeded array data between
+/// metadata structures.
+///
+/// When a byte range is requested, the cache fetches any aligned blocks that
+/// overlap the range and caches them for future reads.  Nearby metadata reads
+/// (e.g., an object header and its continuation chunk, or adjacent B-tree
+/// nodes) naturally share blocks.
+///
+/// Default block size is 8 MiB, which typically resolves all metadata for a
+/// GOES-16 MCMIPF file (~164 datasets) in about 10 requests.
 #[derive(Debug)]
-pub struct ReadaheadCache<F: AsyncFileReader> {
+pub struct BlockCache<F: AsyncFileReader> {
     inner: F,
-    cache: Arc<Mutex<SequentialBlockCache>>,
-    initial: u64,
-    multiplier: f64,
+    blocks: Arc<Mutex<HashMap<u64, Bytes>>>,
+    block_size: u64,
 }
 
-impl<F: AsyncFileReader> ReadaheadCache<F> {
-    /// Create a new ReadaheadCache wrapping the given reader.
-    /// Default: 32 KiB initial prefetch, 2× growth.
+impl<F: AsyncFileReader> BlockCache<F> {
+    /// Create a new BlockCache wrapping the given reader.
+    /// Default block size: 8 MiB.
     pub fn new(inner: F) -> Self {
         Self {
             inner,
-            cache: Arc::new(Mutex::new(SequentialBlockCache::new())),
-            initial: 32 * 1024,
-            multiplier: 2.0,
+            blocks: Arc::new(Mutex::new(HashMap::new())),
+            block_size: 8 * 1024 * 1024,
         }
     }
 
@@ -272,73 +213,93 @@ impl<F: AsyncFileReader> ReadaheadCache<F> {
         &self.inner
     }
 
-    /// Set the initial fetch size in bytes.
-    pub fn with_initial_size(mut self, initial: u64) -> Self {
-        self.initial = initial;
+    /// Set the block size in bytes.
+    pub fn with_block_size(mut self, block_size: u64) -> Self {
+        self.block_size = block_size;
         self
     }
 
-    /// Set the growth multiplier for subsequent fetches.
-    pub fn with_multiplier(mut self, multiplier: f64) -> Self {
-        self.multiplier = multiplier;
-        self
-    }
-
-    fn next_fetch_size(&self, existing_len: u64) -> u64 {
-        if existing_len == 0 {
-            self.initial
-        } else {
-            (existing_len as f64 * self.multiplier).round() as u64
-        }
+    /// Aligned block start for a given offset.
+    fn block_start(&self, offset: u64) -> u64 {
+        offset / self.block_size * self.block_size
     }
 }
 
 #[async_trait]
-impl<F: AsyncFileReader + Send + Sync> AsyncFileReader for ReadaheadCache<F> {
+impl<F: AsyncFileReader + Send + Sync> AsyncFileReader for BlockCache<F> {
     async fn get_bytes(&self, range: Range<u64>) -> Result<Bytes> {
-        let mut cache = self.cache.lock().await;
-
-        if cache.contains(&range) {
-            return Ok(cache.slice(range));
+        let len = (range.end - range.start) as usize;
+        if len == 0 {
+            return Ok(Bytes::new());
         }
 
-        let start_len = cache.len;
-        let needed = range.end.saturating_sub(start_len);
-        let fetch_size = self.next_fetch_size(start_len).max(needed);
-        let fetch_range = start_len..start_len + fetch_size;
+        // Determine which blocks we need.
+        let first_block = self.block_start(range.start);
+        let last_block = self.block_start(range.end.saturating_sub(1));
 
-        // Try to extend the cache. The fetch may fail if we're at or past EOF
-        // (e.g., object_store rejects start >= file_length). Handle gracefully
-        // by serving whatever we already have.
-        match self.inner.get_bytes(fetch_range).await {
-            Ok(bytes) => cache.append(bytes),
-            Err(_) if range.start < cache.len => {
-                // Extension failed (likely EOF), but we can serve a partial response
-                return Ok(cache.slice(range.start..cache.len.min(range.end)));
+        // Fast path: single block (most common case for metadata reads).
+        if first_block == last_block {
+            let block = self.ensure_block(first_block).await?;
+            let local_start = (range.start - first_block) as usize;
+            let local_end = local_start + len;
+            // Handle reads near EOF where block may be shorter.
+            let actual_end = local_end.min(block.len());
+            if local_start >= block.len() {
+                return Ok(Bytes::new());
             }
-            Err(e) => return Err(e),
+            return Ok(block.slice(local_start..actual_end));
         }
 
-        // If we hit EOF, the cache may not fully cover the requested range.
-        // Return whatever is available (the object header parser handles
-        // short buffers via its own bounds checking).
-        if cache.contains(&range) {
-            Ok(cache.slice(range))
-        } else if range.start < cache.len {
-            Ok(cache.slice(range.start..cache.len))
-        } else {
-            // Requested range starts beyond EOF
-            Ok(Bytes::new())
+        // Multi-block: assemble from consecutive blocks.
+        let mut out = BytesMut::with_capacity(len);
+        let mut offset = range.start;
+        let mut block_offset = first_block;
+
+        while offset < range.end {
+            let block = self.ensure_block(block_offset).await?;
+            let local_start = (offset - block_offset) as usize;
+            let bytes_from_block = ((block_offset + self.block_size) - offset)
+                .min(range.end - offset) as usize;
+            let actual_end = (local_start + bytes_from_block).min(block.len());
+            if local_start >= block.len() {
+                break; // EOF
+            }
+            out.extend_from_slice(&block[local_start..actual_end]);
+            if actual_end < local_start + bytes_from_block {
+                break; // EOF mid-block
+            }
+            offset += bytes_from_block as u64;
+            block_offset += self.block_size;
         }
+
+        Ok(out.into())
     }
 
     async fn get_byte_ranges(&self, ranges: Vec<Range<u64>>) -> Result<Vec<Bytes>> {
-        // For metadata reads, ranges are typically sequential and small,
-        // so delegating to get_bytes (which hits the cache) is efficient.
         let mut result = Vec::with_capacity(ranges.len());
         for range in ranges {
             result.push(self.get_bytes(range).await?);
         }
         Ok(result)
+    }
+}
+
+impl<F: AsyncFileReader> BlockCache<F> {
+    /// Ensure a block is in the cache, fetching it if not.
+    async fn ensure_block(&self, block_start: u64) -> Result<Bytes> {
+        {
+            let cache = self.blocks.lock().await;
+            if let Some(block) = cache.get(&block_start) {
+                return Ok(block.clone());
+            }
+        }
+
+        // Fetch the block.  The block may be shorter than block_size at EOF.
+        let fetch_range = block_start..block_start + self.block_size;
+        let data = self.inner.get_bytes(fetch_range).await?;
+
+        let mut cache = self.blocks.lock().await;
+        cache.insert(block_start, data.clone());
+        Ok(data)
     }
 }

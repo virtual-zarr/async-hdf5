@@ -47,8 +47,7 @@ async def open_virtual_hdf5(
     url: str | None = None,
     registry: ObjectStoreRegistry | None = None,
     drop_variables: Iterable[str] | None = None,
-    prefetch: int = 65536,
-    multiplier: float = 2.0,
+    block_size: int = 8 * 1024 * 1024,
 ) -> xr.Dataset:
     """Open an HDF5 file as a virtual xarray Dataset.
 
@@ -75,10 +74,10 @@ async def open_virtual_hdf5(
         *store* is registered under the scheme/netloc of *url*.
     drop_variables
         Variable names to exclude from the virtual dataset.
-    prefetch
-        ReadaheadCache initial fetch size in bytes.
-    multiplier
-        ReadaheadCache growth multiplier.
+    block_size
+        Block cache size in bytes.  Each unique region of the file accessed
+        during metadata parsing triggers a fetch of the aligned block
+        containing that region.  Default 8 MiB.
 
     Returns
     -------
@@ -87,7 +86,7 @@ async def open_virtual_hdf5(
         lazily loaded — indexing or calling ``.load()`` triggers byte-range
         reads from the object store.
     """
-    f = await HDF5File.open(path, store=store, prefetch=prefetch, multiplier=multiplier)
+    f = await HDF5File.open(path, store=store, block_size=block_size)
     root = await f.root_group()
 
     target = (await root.navigate(group)) if group else root

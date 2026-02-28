@@ -15,10 +15,9 @@ pub(crate) struct PyHDF5File {
 
 async fn open_file(
     reader: Arc<dyn async_hdf5::AsyncFileReader>,
-    prefetch: u64,
-    multiplier: f64,
+    block_size: u64,
 ) -> PyAsyncHDF5Result<PyHDF5File> {
-    let file = async_hdf5::HDF5File::open_with_options(reader, prefetch, multiplier).await?;
+    let file = async_hdf5::HDF5File::open_with_block_size(reader, block_size).await?;
     Ok(PyHDF5File {
         inner: Arc::new(file),
     })
@@ -27,18 +26,17 @@ async fn open_file(
 #[pymethods]
 impl PyHDF5File {
     #[classmethod]
-    #[pyo3(signature = (path, *, store, prefetch=65536, multiplier=2.0))]
+    #[pyo3(signature = (path, *, store, block_size=8388608))]
     fn open<'py>(
         _cls: &'py Bound<PyType>,
         py: Python<'py>,
         path: String,
         store: StoreInput,
-        prefetch: u64,
-        multiplier: f64,
+        block_size: u64,
     ) -> PyResult<Bound<'py, PyAny>> {
         let reader = store.into_async_file_reader(path);
         future_into_py(py, async move {
-            Ok(open_file(reader, prefetch, multiplier).await?)
+            Ok(open_file(reader, block_size).await?)
         })
     }
 
