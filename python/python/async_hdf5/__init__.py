@@ -26,3 +26,11 @@ try:
     __all__ += ["open_virtual_hdf5"]
 except ImportError:
     pass
+
+# Lazy store — available when zarr and virtualizarr are installed.
+try:
+    from .lazy_store import LazyHDF5Store, open_lazy_hdf5
+
+    __all__ += ["LazyHDF5Store", "open_lazy_hdf5"]
+except ImportError:
+    pass
