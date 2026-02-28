@@ -6,14 +6,14 @@ dimension scales, and edge cases. Many of these are intentionally corrupted or
 use exotic features (family drivers, virtual datasets, onion VFD, etc.) that
 are not relevant for cloud-native HDF5 reading.
 
-Result summary (HDF5 2.0.0): 199 passed, 232 xfailed.
+Result summary (HDF5 2.0.0): 215 passed, 216 xfailed.
 
 Top failure categories:
   - 44 I/O error (truncated/split files, family driver members)
   - 36 Not an HDF5 file (multi/onion VFD fragments)
   - 16 ExtensibleArray chunk indexing not yet supported
   - 12 object header data too short
-  -  8 Unknown reference type
+  -  0 Unknown reference type (fixed: now skipped with warning)
   -  8 Virtual dataset layout (class 3)
   -  7 dtype V != S/O/c (string/reference/complex mapped to void)
   -  7 Unsupported datatype class (2, 11, 15)
@@ -103,13 +103,8 @@ xfail_files: set[str] = {
     "tools/test/testfiles/h5clear_mdc_image.h5",
     "tools/test/testfiles/h5clear_sec2_v3.h5",
     "tools/test/testfiles/h5clear_status_noclose.h5",
-    "tools/test/testfiles/h5copy_ref.h5",
     "tools/test/testfiles/h5copytst.h5",
     "tools/test/testfiles/h5copytst_new.h5",
-    "tools/test/testfiles/h5diff_dset1.h5",
-    "tools/test/testfiles/h5diff_dset2.h5",
-    "tools/test/testfiles/h5diff_dset3.h5",
-    "tools/test/testfiles/h5diff_enum_invalid_values.h5",
     "tools/test/testfiles/h5diff_ext2softlink_trg.h5",
     "tools/test/testfiles/h5diff_grp_recurse_ext1.h5",
     "tools/test/testfiles/h5diff_grp_recurse_ext2-1.h5",
@@ -132,7 +127,6 @@ xfail_files: set[str] = {
     "tools/test/testfiles/h5fc_non_v3.h5",
     "tools/test/testfiles/h5repack_CVE-2018-14460.h5",
     "tools/test/testfiles/h5repack_CVE-2018-17432.h5",
-    "tools/test/testfiles/h5repack_deflate.h5",
     "tools/test/testfiles/h5repack_ext.h5",
     "tools/test/testfiles/h5repack_f32le_ex.h5",
     "tools/test/testfiles/h5repack_filters.h5",
@@ -145,7 +139,6 @@ xfail_files: set[str] = {
     "tools/test/testfiles/h5repack_named_dtypes.h5",
     "tools/test/testfiles/h5repack_nbit.h5",
     "tools/test/testfiles/h5repack_objs.h5",
-    "tools/test/testfiles/h5repack_refs.h5",
     "tools/test/testfiles/h5repack_soffset.h5",
     "tools/test/testfiles/h5repack_szip.h5",
     "tools/test/testfiles/h5repack_uint8be_ex.h5",
@@ -215,15 +208,6 @@ xfail_files: set[str] = {
     "tools/test/testfiles/tnestedcmpddt.h5",
     "tools/test/testfiles/tnestedcomp.h5",
     "tools/test/testfiles/tnullspace.h5",
-    "tools/test/testfiles/trefer_attr.h5",
-    "tools/test/testfiles/trefer_compat.h5",
-    "tools/test/testfiles/trefer_ext2.h5",
-    "tools/test/testfiles/trefer_grp.h5",
-    "tools/test/testfiles/trefer_obj.h5",
-    "tools/test/testfiles/trefer_obj_del.h5",
-    "tools/test/testfiles/trefer_param.h5",
-    "tools/test/testfiles/trefer_reg.h5",
-    "tools/test/testfiles/trefer_reg_1d.h5",
     "tools/test/testfiles/tsaf.h5",
     "tools/test/testfiles/tscalarintattrsize.h5",
     "tools/test/testfiles/tscalarintsize.h5",

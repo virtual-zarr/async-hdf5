@@ -33,7 +33,11 @@ fn endian_char(bo: &ByteOrder) -> &'static str {
 }
 
 /// Convert a DataType to a numpy-compatible dtype string (e.g., "<f4", ">i8", "<c16").
-fn datatype_to_numpy_str(dt: &DataType) -> String {
+///
+/// Returns `Err` with a descriptive message for types that cannot be
+/// meaningfully represented as a fixed numpy dtype (VarLen, Reference).
+/// The error message suggests using `drop_variables` to skip the dataset.
+fn datatype_to_numpy_str(dt: &DataType) -> Result<String, String> {
     match dt {
         DataType::FixedPoint {
             size,
@@ -43,12 +47,18 @@ fn datatype_to_numpy_str(dt: &DataType) -> String {
         } => {
             let e = if *size == 1 { "|" } else { endian_char(byte_order) };
             let c = if *signed { "i" } else { "u" };
-            format!("{}{}{}", e, c, size)
+            Ok(format!("{}{}{}", e, c, size))
         }
         DataType::FloatingPoint {
             size, byte_order, ..
+        } => Ok(format!("{}f{}", endian_char(byte_order), size)),
+        DataType::String { size, .. } => Ok(format!("|S{}", size)),
+        DataType::Enum { base_type, .. } => datatype_to_numpy_str(base_type),
+        DataType::Bitfield {
+            size, byte_order, ..
         } => {
-            format!("{}f{}", endian_char(byte_order), size)
+            let e = if *size == 1 { "|" } else { endian_char(byte_order) };
+            Ok(format!("{}u{}", e, size))
         }
         DataType::Compound { size, fields, .. } if fields.len() == 2 => {
             // Detect complex: compound with two float fields named r/i or real/imag
@@ -61,12 +71,33 @@ fn datatype_to_numpy_str(dt: &DataType) -> String {
                     DataType::FloatingPoint { byte_order, .. } => endian_char(byte_order),
                     _ => "|",
                 };
-                format!("{}c{}", bo, size)
+                Ok(format!("{}c{}", bo, size))
             } else {
-                format!("|V{}", size)
+                Ok(format!("|V{}", size))
             }
         }
-        _ => format!("|V{}", dt.size()),
+        DataType::VarLen { is_string, .. } => {
+            if *is_string {
+                Err(
+                    "Variable-length string datatype cannot be represented as a fixed \
+                     numpy dtype. Use drop_variables to skip this dataset."
+                        .into(),
+                )
+            } else {
+                Err(
+                    "Variable-length sequence datatype cannot be represented as a fixed \
+                     numpy dtype. Use drop_variables to skip this dataset."
+                        .into(),
+                )
+            }
+        }
+        DataType::Reference { ref_type, .. } => Err(format!(
+            "HDF5 reference datatype (ref_type={}) is not supported. \
+             Use drop_variables to skip this dataset.",
+            ref_type
+        )),
+        // Opaque, Compound (non-complex), Array → void bytes
+        _ => Ok(format!("|V{}", dt.size())),
     }
 }
 
@@ -93,9 +124,13 @@ impl PyHDF5Dataset {
     }
 
     /// Numpy-compatible dtype string (e.g., "<f4", ">i8", "<c16").
+    ///
+    /// Raises ``ValueError`` for datatypes that cannot be represented as
+    /// a fixed numpy dtype (variable-length, reference).
     #[getter]
-    fn numpy_dtype(&self) -> String {
+    fn numpy_dtype(&self) -> PyResult<String> {
         datatype_to_numpy_str(self.inner.dtype())
+            .map_err(|msg| pyo3::exceptions::PyValueError::new_err(msg))
     }
 
     #[getter]

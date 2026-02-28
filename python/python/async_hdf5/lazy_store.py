@@ -681,8 +681,19 @@ async def open_lazy_hdf5(
 
     # Build lightweight metadata cache (no chunk indices!)
     dataset_infos: dict[str, _DatasetInfo] = {}
+    skipped: list[tuple[str, str]] = []
     for name, ds in datasets.items():
-        dataset_infos[name] = _DatasetInfo(ds, dimension_names=dim_names_map[name])
+        try:
+            dataset_infos[name] = _DatasetInfo(ds, dimension_names=dim_names_map[name])
+        except (ValueError, TypeError) as exc:
+            skipped.append((name, str(exc)))
+    if skipped:
+        details = "; ".join(f"{n}: {e}" for n, e in skipped)
+        warnings.warn(
+            f"Skipped {len(skipped)} dataset(s) with unsupported types: {details}. "
+            f"Use drop_variables to suppress this warning.",
+            stacklevel=2,
+        )
 
     # Get group attributes
     group_attrs = await target.attributes()
