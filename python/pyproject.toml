@@ -25,6 +25,24 @@ dev = [
     "pytest-asyncio>=1.3",
     "pytest>=9.0",
 ]
+test = [
+    "h5py>=3.11",
+    "virtualizarr>=2.0",
+    "xarray>=2025.1.0",
+    "zarr>=3.0",
+    "numcodecs>=0.15",
+    "obspec-utils",
+    "obstore>=0.5.1",
+    "numpy>=2.0",
+    "pytest>=9.0",
+    "pytest-asyncio>=1.3",
+    "pytest-cov",
+    "maturin>=1.7.4",
+]
+scripts = [
+    "obstore>=0.5.1",
+    "pooch>=1.8",
+]
 notebook = [
     "earthaccess",
     "h5netcdf",
@@ -37,6 +55,7 @@ notebook = [
     "xarray",
     "jupyter",
     "h5py",
+    "pyinstrument",
 ]
 
 [tool.pytest.ini_options]
@@ -44,3 +63,7 @@ addopts = "--color=yes"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "network: tests requiring network access",
+    "slow: tests that are slow (large files)",
+]

@@ -1,0 +1,14 @@
+{
+  "ECMWF_ERA-40_subset.nc": {
+    "url": "https://archive.unidata.ucar.edu/software/netcdf/examples/ECMWF_ERA-40_subset.nc",
+    "hash": "sha256:f5d5bb82811e74179894a87e439acbb952eb692181570b97bcfbc9f61aa18890"
+  },
+  "tos_O1_2001-2002.nc": {
+    "url": "https://archive.unidata.ucar.edu/software/netcdf/examples/tos_O1_2001-2002.nc",
+    "hash": "sha256:ecd54cdd054cb6a529d47bd0af1cc8d6a45cb6e22f4f209562084b6b5af01ba8"
+  },
+  "madis-maritime.nc": {
+    "url": "https://archive.unidata.ucar.edu/software/netcdf/examples/madis-maritime.nc",
+    "hash": "sha256:b94cc7f0900218ad1f214480dfeb2c438a912939fc19e17e0a8ce1c0c75f9242"
+  }
+}
