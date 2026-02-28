@@ -379,10 +379,13 @@ class LazyHDF5Store(Store):
         prototype: BufferPrototype,
         key_ranges: Iterable[tuple[str, ByteRequest | None]],
     ) -> list[Buffer | None]:
-        return [
-            await self.get(key, prototype, byte_range)
-            for key, byte_range in key_ranges
-        ]
+        import asyncio
+
+        return list(
+            await asyncio.gather(
+                *(self.get(key, prototype, byte_range) for key, byte_range in key_ranges)
+            )
+        )
 
     # ------------------------------------------------------------------
     # Existence
