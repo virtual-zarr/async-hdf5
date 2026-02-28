@@ -9,8 +9,6 @@
 
 use std::sync::Arc;
 
-use bytes::Bytes;
-
 use crate::endian::HDF5Reader;
 use crate::error::{HDF5Error, Result};
 use crate::reader::AsyncFileReader;
@@ -84,7 +82,7 @@ impl FixedArrayHeader {
 ///
 /// `layout_version` is the data layout message version (4 or 5) — this affects
 /// how filtered chunk entries are encoded.
-pub async fn read_fixed_array_entries(
+pub(crate) async fn read_fixed_array_entries(
     reader: &Arc<dyn AsyncFileReader>,
     header: &FixedArrayHeader,
     size_of_offsets: u8,
@@ -96,7 +94,7 @@ pub async fn read_fixed_array_entries(
         return Ok(vec![]);
     }
 
-    let is_filtered = header.client_id == 1;
+    let _is_filtered = header.client_id == 1;
     let num_entries = header.max_num_entries as usize;
 
     // Determine if paging is used
@@ -270,7 +268,7 @@ pub(crate) fn parse_entries(
     r: &mut HDF5Reader,
     count: usize,
     is_filtered: bool,
-    size_of_offsets: u8,
+    _size_of_offsets: u8,
     uncompressed_chunk_size: u64,
     layout_version: u8,
 ) -> Result<Vec<FixedArrayChunkEntry>> {
@@ -286,7 +284,7 @@ pub(crate) fn parse_entries(
             } else {
                 // v4: chunk size uses a variable encoding
                 // "entry_size - size_of_offsets - 4" bytes for the size field
-                let size_field_len =
+                let _size_field_len =
                     (r.get_ref().len() as u64 - r.position()).min(8) as u8; // fallback
                 // Actually, the entry_size tells us exactly how many bytes per entry.
                 // entry_size = size_of_offsets + chunk_size_bytes + 4 (filter_mask)

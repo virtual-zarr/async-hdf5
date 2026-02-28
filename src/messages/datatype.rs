@@ -6,7 +6,9 @@ use crate::error::{HDF5Error, Result};
 /// Byte order for multi-byte data types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ByteOrder {
+    /// Little-endian byte order.
     LittleEndian,
+    /// Big-endian byte order.
     BigEndian,
     /// VAX-endian (rare, HDF5 legacy).
     Vax,
@@ -17,23 +19,31 @@ pub enum ByteOrder {
 /// String padding type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StringPadding {
+    /// Null-terminated string.
     NullTerminate,
+    /// Null-padded string.
     NullPad,
+    /// Space-padded string.
     SpacePad,
 }
 
 /// String character set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Charset {
+    /// ASCII character set.
     Ascii,
+    /// UTF-8 character set.
     Utf8,
 }
 
 /// A field within a compound data type.
 #[derive(Debug, Clone)]
 pub struct CompoundField {
+    /// Field name.
     pub name: String,
+    /// Byte offset of the field within the compound type.
     pub byte_offset: u32,
+    /// Data type of the field.
     pub dtype: DataType,
 }
 
@@ -44,39 +54,61 @@ pub struct CompoundField {
 pub enum DataType {
     /// Fixed-point integers (signed/unsigned, various sizes).
     FixedPoint {
+        /// Total size in bytes.
         size: u32,
+        /// Whether the integer is signed.
         signed: bool,
+        /// Byte order.
         byte_order: ByteOrder,
+        /// Bit offset of the first significant bit.
         bit_offset: u16,
+        /// Number of significant bits.
         bit_precision: u16,
     },
     /// IEEE 754 floating-point.
     FloatingPoint {
+        /// Total size in bytes.
         size: u32,
+        /// Byte order.
         byte_order: ByteOrder,
+        /// Bit offset of the first significant bit.
         bit_offset: u16,
+        /// Number of significant bits.
         bit_precision: u16,
+        /// Bit position of the exponent field.
         exponent_location: u8,
+        /// Size of the exponent field in bits.
         exponent_size: u8,
+        /// Bit position of the mantissa field.
         mantissa_location: u8,
+        /// Size of the mantissa field in bits.
         mantissa_size: u8,
+        /// Exponent bias.
         exponent_bias: u32,
     },
     /// Fixed-length or variable-length strings.
     String {
+        /// Total size in bytes (0 for variable-length).
         size: u32,
+        /// Padding type.
         padding: StringPadding,
+        /// Character set.
         charset: Charset,
     },
     /// Compound types (e.g., CFloat32 = {r: float32, i: float32}).
     Compound {
+        /// Total size in bytes.
         size: u32,
+        /// Member fields.
         fields: Vec<CompoundField>,
     },
     /// Enumerated types.
     Enum {
+        /// Total size in bytes.
         size: u32,
+        /// Underlying integer type.
         base_type: Box<DataType>,
+        /// Enum member names and their raw values.
         members: Vec<(String, Vec<u8>)>,
     },
     /// Variable-length sequences or strings.
@@ -88,24 +120,34 @@ pub enum DataType {
     },
     /// Fixed-size array of another type.
     Array {
+        /// Element type.
         base_type: Box<DataType>,
+        /// Array dimensions.
         dimensions: Vec<u32>,
     },
     /// Opaque data.
     Opaque {
+        /// Total size in bytes.
         size: u32,
+        /// ASCII tag describing the opaque type.
         tag: String,
     },
     /// Bitfield.
     Bitfield {
+        /// Total size in bytes.
         size: u32,
+        /// Byte order.
         byte_order: ByteOrder,
+        /// Bit offset of the first significant bit.
         bit_offset: u16,
+        /// Number of significant bits.
         bit_precision: u16,
     },
     /// Reference type.
     Reference {
+        /// Total size in bytes.
         size: u32,
+        /// Reference type (0 = object, 1 = region).
         ref_type: u8,
     },
 }

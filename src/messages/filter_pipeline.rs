@@ -5,11 +5,17 @@ use crate::error::{HDF5Error, Result};
 
 /// Well-known HDF5 filter IDs.
 pub mod filter_ids {
+    /// Deflate (zlib) compression.
     pub const DEFLATE: u16 = 1;
+    /// Byte shuffle filter.
     pub const SHUFFLE: u16 = 2;
+    /// Fletcher32 checksum.
     pub const FLETCHER32: u16 = 3;
+    /// SZIP compression.
     pub const SZIP: u16 = 4;
+    /// N-bit packing filter.
     pub const NBIT: u16 = 5;
+    /// Scale-offset filter.
     pub const SCALEOFFSET: u16 = 6;
 }
 
@@ -47,6 +53,7 @@ impl Filter {
 /// Message type 0x000B.
 #[derive(Debug, Clone)]
 pub struct FilterPipeline {
+    /// The ordered list of filters in the pipeline.
     pub filters: Vec<Filter>,
 }
 

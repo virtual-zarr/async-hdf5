@@ -25,6 +25,7 @@ pub struct FractalHeap {
     /// Size of heap IDs for this heap.
     id_length: u16,
     /// Maximum size of managed objects.
+    #[allow(dead_code)]
     max_managed_object_size: u32,
     /// Starting block size in the doubling table.
     starting_block_size: u64,
@@ -39,12 +40,16 @@ pub struct FractalHeap {
     /// Current number of rows in root indirect block. 0 = root is a direct block.
     current_root_rows: u16,
     /// Whether direct blocks have checksums.
+    #[allow(dead_code)]
     checksum_direct_blocks: bool,
     /// Number of managed objects.
+    #[allow(dead_code)]
     num_managed_objects: u64,
     /// Filtered root direct block size (if I/O filters present).
+    #[allow(dead_code)]
     filtered_root_size: Option<u64>,
     /// I/O filter mask (if filters present).
+    #[allow(dead_code)]
     filter_mask: Option<u32>,
     /// I/O filters encoded length.
     io_filters_length: u16,

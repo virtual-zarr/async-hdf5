@@ -291,7 +291,7 @@ impl AttributeMessage {
     fn parse_v1(
         r: &mut HDF5Reader,
         data: &Bytes,
-        size_of_offsets: u8,
+        _size_of_offsets: u8,
         size_of_lengths: u8,
     ) -> Result<Self> {
         r.skip(1); // reserved
@@ -344,7 +344,7 @@ impl AttributeMessage {
     fn parse_v2(
         r: &mut HDF5Reader,
         data: &Bytes,
-        size_of_offsets: u8,
+        _size_of_offsets: u8,
         size_of_lengths: u8,
     ) -> Result<Self> {
         // v2: same as v1 but no padding on name/dt/ds
@@ -388,7 +388,7 @@ impl AttributeMessage {
     fn parse_v3(
         r: &mut HDF5Reader,
         data: &Bytes,
-        size_of_offsets: u8,
+        _size_of_offsets: u8,
         size_of_lengths: u8,
     ) -> Result<Self> {
         // v3: same as v2 but with creation order

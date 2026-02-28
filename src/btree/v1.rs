@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use bytes::Bytes;
-
 use crate::endian::HDF5Reader;
 use crate::error::{HDF5Error, Result};
 use crate::heap::local::LocalHeap;

@@ -7,6 +7,7 @@ use crate::error::{HDF5Error, Result};
 const OHDR_SIGNATURE: [u8; 4] = [b'O', b'H', b'D', b'R'];
 
 /// Object Header Continuation signature (v2).
+#[allow(dead_code)]
 const OCHK_SIGNATURE: [u8; 4] = [b'O', b'C', b'H', b'K'];
 
 /// A raw header message (type + data bytes, not yet parsed into a specific message).
@@ -91,7 +92,7 @@ impl ObjectHeader {
     /// and we need to fetch more data from a different file offset. For the
     /// initial parse (from a single prefetched buffer), pass `None`.
     pub fn parse(data: &Bytes, size_of_offsets: u8, size_of_lengths: u8) -> Result<Self> {
-        let r = HDF5Reader::with_sizes(data.clone(), size_of_offsets, size_of_lengths);
+        let _r = HDF5Reader::with_sizes(data.clone(), size_of_offsets, size_of_lengths);
 
         // Peek at first bytes to determine version
         if data.len() >= 4 && data[0..4] == OHDR_SIGNATURE {

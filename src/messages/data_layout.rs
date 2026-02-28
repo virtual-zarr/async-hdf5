@@ -27,6 +27,7 @@ pub enum ChunkIndexType {
 pub enum StorageLayout {
     /// Data stored inline in the object header. For very small datasets.
     Compact {
+        /// The inline data bytes.
         data: Bytes,
     },
 
@@ -60,19 +61,27 @@ pub enum ChunkIndexParams {
     None,
     /// Single chunk: filtered chunk size and filter mask.
     SingleChunk {
+        /// Size of the filtered (compressed) chunk in bytes.
         filtered_size: u64,
+        /// Bit mask indicating which filters were not applied.
         filter_mask: u32,
     },
     /// Fixed array: page bits.
     FixedArray {
+        /// Log2 of the number of entries per data block page.
         page_bits: u8,
     },
     /// Extensible array: max bits, index elements, min pointers, min elements, page bits.
     ExtensibleArray {
+        /// Number of bits for the max number of elements in a data block.
         max_bits: u8,
+        /// Number of elements in an index block.
         index_elements: u8,
+        /// Minimum number of data block pointers in a secondary block.
         min_pointers: u8,
+        /// Minimum number of elements in a data block.
         min_elements: u8,
+        /// Number of bits for data block page size.
         page_bits: u8,
     },
 }
@@ -151,8 +160,8 @@ impl StorageLayout {
     /// Parse layout message version 3.
     fn parse_v3(
         r: &mut HDF5Reader,
-        size_of_offsets: u8,
-        size_of_lengths: u8,
+        _size_of_offsets: u8,
+        _size_of_lengths: u8,
     ) -> Result<Self> {
         let layout_class = r.read_u8()?;
 
@@ -199,9 +208,9 @@ impl StorageLayout {
     /// Parse layout message version 4 or 5 (modern, with chunk indexing types).
     fn parse_v4_v5(
         r: &mut HDF5Reader,
-        version: u8,
-        size_of_offsets: u8,
-        size_of_lengths: u8,
+        _version: u8,
+        _size_of_offsets: u8,
+        _size_of_lengths: u8,
     ) -> Result<Self> {
         let layout_class = r.read_u8()?;
 

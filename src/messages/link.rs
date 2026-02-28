@@ -6,8 +6,11 @@ use crate::error::{HDF5Error, Result};
 /// Link type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinkType {
+    /// Hard link — points directly to an object header.
     Hard,
+    /// Soft link — symbolic reference by path string.
     Soft,
+    /// External link — reference to an object in another file.
     External,
 }
 
@@ -33,7 +36,7 @@ impl LinkMessage {
     pub fn parse(data: &Bytes, size_of_offsets: u8, size_of_lengths: u8) -> Result<Self> {
         let mut r = HDF5Reader::with_sizes(data.clone(), size_of_offsets, size_of_lengths);
 
-        let version = r.read_u8()?;
+        let _version = r.read_u8()?;
         let flags = r.read_u8()?;
 
         // Flags bits:
@@ -59,7 +62,7 @@ impl LinkMessage {
             None
         };
 
-        let charset = if flags & 0x10 != 0 {
+        let _charset = if flags & 0x10 != 0 {
             r.read_u8()? // 0=ASCII, 1=UTF-8
         } else {
             0
