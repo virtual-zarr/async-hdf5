@@ -30,9 +30,9 @@ pub struct FixedArrayHeader {
     pub data_block_address: u64,
 }
 
-/// A single chunk entry from the fixed array.
+/// A single chunk entry from a fixed or extensible array.
 #[derive(Debug, Clone)]
-pub struct FixedArrayChunkEntry {
+pub(crate) struct FixedArrayChunkEntry {
     /// File byte offset of the chunk.
     pub address: u64,
     /// Chunk size in bytes (compressed/on-disk). For non-filtered, this is computed.
@@ -266,7 +266,7 @@ async fn read_paged_entries(
 }
 
 /// Parse chunk entries from a reader.
-fn parse_entries(
+pub(crate) fn parse_entries(
     r: &mut HDF5Reader,
     count: usize,
     is_filtered: bool,
@@ -320,7 +320,7 @@ fn parse_entries(
 }
 
 /// Calculate how many bytes are needed to encode a value, plus one (HDF5 convention).
-fn bytes_needed_for(value: u64) -> u8 {
+pub(crate) fn bytes_needed_for(value: u64) -> u8 {
     if value == 0 {
         return 1;
     }
@@ -331,7 +331,7 @@ fn bytes_needed_for(value: u64) -> u8 {
 }
 
 /// Read an N-byte unsigned integer (little-endian).
-fn read_n_byte_uint(r: &mut HDF5Reader, n: u8) -> Result<u64> {
+pub(crate) fn read_n_byte_uint(r: &mut HDF5Reader, n: u8) -> Result<u64> {
     let bytes = r.read_bytes(n as usize)?;
     let mut val = 0u64;
     for (i, &b) in bytes.iter().enumerate() {

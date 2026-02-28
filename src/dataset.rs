@@ -4,6 +4,7 @@ use crate::btree;
 use crate::chunk_index::{ChunkIndex, ChunkLocation};
 use crate::endian::HDF5Reader;
 use crate::error::{HDF5Error, Result};
+use crate::extensible_array;
 use crate::fixed_array;
 use crate::group::attributes_from_header;
 use crate::messages::attribute::Attribute;
@@ -231,6 +232,14 @@ impl HDF5Dataset {
                         )
                         .await
                     }
+                    ChunkIndexType::ExtensibleArray => {
+                        self.chunk_index_extensible_array(
+                            *index_address,
+                            chunk_shape,
+                            *flags,
+                        )
+                        .await
+                    }
                     other => Err(HDF5Error::General(format!(
                         "chunk indexing type {other:?} not yet supported"
                     ))),
@@ -441,6 +450,73 @@ impl HDF5Dataset {
                 byte_offset: entry.address,
                 byte_length: entry.chunk_size,
                 filter_mask: entry.filter_mask,
+            });
+        }
+
+        Ok(ChunkIndex::new(
+            locations,
+            chunk_shape.to_vec(),
+            self.shape.clone(),
+        ))
+    }
+
+    /// Extract chunk index from an Extensible Array (type 4).
+    async fn chunk_index_extensible_array(
+        &self,
+        eahd_address: u64,
+        chunk_shape: &[u64],
+        layout_flags: u8,
+    ) -> Result<ChunkIndex> {
+        let ndims = self.shape.len();
+
+        // Read the EAHD header
+        let eahd = extensible_array::ExtensibleArrayHeader::read(
+            &self.reader,
+            eahd_address,
+            self.superblock.size_of_offsets,
+            self.superblock.size_of_lengths,
+        )
+        .await?;
+
+        // Compute uncompressed chunk size for non-filtered entries
+        let uncompressed_chunk_size =
+            chunk_shape.iter().product::<u64>() * self.dtype.size() as u64;
+
+        let layout_version = if layout_flags & 0x02 != 0 { 4u8 } else { 4u8 };
+
+        // Read all entries from the EA structure
+        let entries = extensible_array::read_extensible_array_entries(
+            &self.reader,
+            &eahd,
+            self.superblock.size_of_offsets,
+            self.superblock.size_of_lengths,
+            uncompressed_chunk_size,
+            layout_version,
+        )
+        .await?;
+
+        // Convert to ChunkLocations using flat indices from EA
+        let grid_shape: Vec<u64> = self
+            .shape
+            .iter()
+            .zip(chunk_shape.iter())
+            .map(|(&ds, &cs)| (ds + cs - 1) / cs)
+            .collect();
+
+        let mut locations = Vec::with_capacity(entries.len());
+        for indexed in &entries {
+            let mut indices = vec![0u64; ndims];
+            let mut remaining = indexed.flat_idx;
+            for d in (0..ndims).rev() {
+                indices[d] = remaining % grid_shape[d];
+                remaining /= grid_shape[d];
+            }
+
+            locations.push(ChunkLocation {
+                indices,
+                byte_offset: indexed.entry.address,
+                byte_length: indexed.entry.chunk_size,
+                filter_mask: indexed.entry.filter_mask,
             });
         }
 

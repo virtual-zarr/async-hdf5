@@ -6,12 +6,12 @@ dimension scales, and edge cases. Many of these are intentionally corrupted or
 use exotic features (family drivers, virtual datasets, onion VFD, etc.) that
 are not relevant for cloud-native HDF5 reading.
 
-Result summary (HDF5 2.0.0): 215 passed, 216 xfailed.
+Result summary (HDF5 2.0.0): 216 passed, 215 xfailed.
 
 Top failure categories:
   - 44 I/O error (truncated/split files, family driver members)
   - 36 Not an HDF5 file (multi/onion VFD fragments)
-  - 16 ExtensibleArray chunk indexing not yet supported
+  -  0 ExtensibleArray chunk indexing (fixed: now supported)
   - 12 object header data too short
   -  0 Unknown reference type (fixed: now skipped with warning)
   -  8 Virtual dataset layout (class 3)
@@ -115,7 +115,6 @@ xfail_files: set[str] = {
     "tools/test/testfiles/h5diff_strings2.h5",
     "tools/test/testfiles/h5diff_types.h5",
     "tools/test/testfiles/h5fc_edge_v3.h5",
-    "tools/test/testfiles/h5fc_err_level.h5",
     "tools/test/testfiles/h5fc_ext1_f.h5",
     "tools/test/testfiles/h5fc_ext1_i.h5",
     "tools/test/testfiles/h5fc_ext1_s.h5",

@@ -67,12 +67,13 @@ pub enum ChunkIndexParams {
     FixedArray {
         page_bits: u8,
     },
-    /// Extensible array: max bits, index bits, min pointers, min elements.
+    /// Extensible array: max bits, index elements, min pointers, min elements, page bits.
     ExtensibleArray {
         max_bits: u8,
         index_elements: u8,
         min_pointers: u8,
         min_elements: u8,
+        page_bits: u8,
     },
 }
 
@@ -280,6 +281,7 @@ impl StorageLayout {
                         let index_elements = r.read_u8()?;
                         let min_pointers = r.read_u8()?;
                         let min_elements = r.read_u8()?;
+                        let page_bits = r.read_u8()?;
                         (
                             ChunkIndexType::ExtensibleArray,
                             ChunkIndexParams::ExtensibleArray {
@@ -287,6 +289,7 @@ impl StorageLayout {
                                 index_elements,
                                 min_pointers,
                                 min_elements,
+                                page_bits,
                             },
                         )
                     }

@@ -25,6 +25,8 @@ pub mod messages;
 
 /// B-tree implementations (v1 and v2).
 pub mod btree;
+/// Extensible Array chunk index reader.
+pub mod extensible_array;
 /// Fixed Array chunk index reader.
 pub mod fixed_array;
 /// Heap implementations (local and fractal).
