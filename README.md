@@ -4,7 +4,7 @@
 > This library is under active development and not ready for production use.
 > The API may change without notice. Known limitations:
 >
-> - **Metadata only** — does not decompress or decode array data; designed for building virtual Zarr stores, not direct data access.
+> - **Metadata only** — does not decompress or decode array data; designed for serving HDF5 via Zarr's data protocol.
 > - **Incomplete HDF5 coverage** — object header v0, HDF5 Time datatype (class 2), virtual dataset layout, and external data links are not supported. Some compound/array dtype edge cases produce incorrect numpy dtype mappings.
 > - **Limited testing on real-world files** — validated against the HDF5 library test suite (59% pass rate), GDAL autotest files, and a small set of NASA/NOAA data. Many exotic HDF5 features remain untested.
 > - **No fuzz testing** — the binary parser has not been fuzz-tested against adversarial inputs. While known panics have been fixed, corrupt files may trigger unexpected errors.
