@@ -406,7 +406,7 @@ impl HDF5Dataset {
         &self,
         fahd_address: u64,
         chunk_shape: &[u64],
-        layout_flags: u8,
+        _layout_flags: u8,
     ) -> Result<ChunkIndex> {
         let ndims = self.shape.len();
 
@@ -480,7 +480,7 @@ impl HDF5Dataset {
         &self,
         eahd_address: u64,
         chunk_shape: &[u64],
-        layout_flags: u8,
+        _layout_flags: u8,
     ) -> Result<ChunkIndex> {
         let ndims = self.shape.len();
 
