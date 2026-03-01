@@ -125,14 +125,7 @@ pub struct AttributeMessage {
 impl AttributeMessage {
     /// Decode the raw value bytes into a typed `AttributeValue`.
     pub fn decode(&self) -> AttributeValue {
-        let num_elements: u64 = self
-            .dataspace
-            .dimensions
-            .iter()
-            .copied()
-            .product::<u64>()
-            .max(1);
-        let n = num_elements as usize;
+        let n = num_elements(&self.dataspace.dimensions) as usize;
         let raw = &self.raw_value;
 
         match &self.dtype {
@@ -324,14 +317,7 @@ impl AttributeMessage {
         r.skip(ds_pad as u64);
 
         // Value
-        let num_elements: u64 = dataspace.dimensions.iter().copied().product::<u64>().max(1);
-        let value_size = (num_elements * dtype.size() as u64) as usize;
-        let val_start = r.position() as usize;
-        let raw_value = if val_start + value_size <= data.len() {
-            data.slice(val_start..val_start + value_size)
-        } else {
-            Bytes::new()
-        };
+        let raw_value = extract_raw_value(r, data, &dataspace, &dtype);
 
         Ok(Self {
             name,
@@ -368,14 +354,7 @@ impl AttributeMessage {
         let dataspace = DataspaceMessage::parse(&ds_bytes, size_of_lengths)?;
         r.skip(dataspace_size as u64);
 
-        let num_elements: u64 = dataspace.dimensions.iter().copied().product::<u64>().max(1);
-        let value_size = (num_elements * dtype.size() as u64) as usize;
-        let val_start = r.position() as usize;
-        let raw_value = if val_start + value_size <= data.len() {
-            data.slice(val_start..val_start + value_size)
-        } else {
-            Bytes::new()
-        };
+        let raw_value = extract_raw_value(r, data, &dataspace, &dtype);
 
         Ok(Self {
             name,
@@ -418,14 +397,7 @@ impl AttributeMessage {
         let dataspace = DataspaceMessage::parse(&ds_bytes, size_of_lengths)?;
         r.skip(dataspace_size as u64);
 
-        let num_elements: u64 = dataspace.dimensions.iter().copied().product::<u64>().max(1);
-        let value_size = (num_elements * dtype.size() as u64) as usize;
-        let val_start = r.position() as usize;
-        let raw_value = if val_start + value_size <= data.len() {
-            data.slice(val_start..val_start + value_size)
-        } else {
-            Bytes::new()
-        };
+        let raw_value = extract_raw_value(r, data, &dataspace, &dtype);
 
         Ok(Self {
             name,
@@ -433,6 +405,34 @@ impl AttributeMessage {
             dataspace,
             raw_value,
         })
+    }
+}
+
+/// Compute the total number of elements from dataspace dimensions using
+/// saturating arithmetic to avoid overflow panics on malformed data.
+fn num_elements(dimensions: &[u64]) -> u64 {
+    dimensions
+        .iter()
+        .copied()
+        .fold(1u64, |acc, d| acc.saturating_mul(d))
+        .max(1)
+}
+
+/// Extract the raw value bytes at the current reader position, using the
+/// dataspace dimensions and dtype size to compute how many bytes to read.
+fn extract_raw_value(
+    r: &HDF5Reader,
+    data: &Bytes,
+    dataspace: &DataspaceMessage,
+    dtype: &DataType,
+) -> Bytes {
+    let n = num_elements(&dataspace.dimensions);
+    let value_size = n.saturating_mul(dtype.size() as u64) as usize;
+    let val_start = r.position() as usize;
+    if val_start + value_size <= data.len() {
+        data.slice(val_start..val_start + value_size)
+    } else {
+        Bytes::new()
     }
 }
 

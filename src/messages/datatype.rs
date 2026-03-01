@@ -163,7 +163,11 @@ impl DataType {
             DataType::Enum { size, .. } => *size,
             DataType::VarLen { .. } => 16, // HDF5 vlen: {size, pointer}
             DataType::Array { base_type, dimensions } => {
-                base_type.size() * dimensions.iter().product::<u32>()
+                let dim_product = dimensions
+                    .iter()
+                    .copied()
+                    .fold(1u32, |acc, d| acc.saturating_mul(d));
+                base_type.size().saturating_mul(dim_product)
             }
             DataType::Opaque { size, .. } => *size,
             DataType::Bitfield { size, .. } => *size,
@@ -340,9 +344,9 @@ impl DataType {
                 // v1: dimensionality (1 byte) + reserved (3 bytes) + perm (4 bytes) + reserved (4 bytes) + dims (4*4 bytes)
                 // v2: no dimensionality
                 if version == 1 {
-                    let ndims = r.read_u8()?;
+                    let _ndims = r.read_u8()?;
                     r.skip(3 + 4 + 4); // reserved + permutation + reserved
-                    r.skip(ndims as u64 * 4); // dimension sizes
+                    r.skip(4 * 4); // dimension sizes — always 4 slots in v1
                 }
                 offset
             } else {
