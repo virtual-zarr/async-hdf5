@@ -104,7 +104,18 @@ fn datatype_to_numpy_str(dt: &DataType) -> Result<String, String> {
             ref_type
         )),
         // Opaque, Compound (non-complex), Array → void bytes
-        _ => Ok(format!("|V{}", dt.size())),
+        _ => {
+            let size = dt.size();
+            if size > 1_048_576 {
+                Err(format!(
+                    "Datatype too large for numpy void dtype: {} bytes. \
+                     Use drop_variables to skip this dataset.",
+                    size
+                ))
+            } else {
+                Ok(format!("|V{}", size))
+            }
+        }
     }
 }
 
@@ -168,6 +179,18 @@ impl PyHDF5Dataset {
     #[getter]
     fn fill_value(&self) -> Option<Vec<u8>> {
         self.inner.fill_value().map(|v| v.to_vec())
+    }
+
+    /// Whether this dataset has a null dataspace (no data).
+    #[getter]
+    fn is_null_dataspace(&self) -> bool {
+        self.inner.is_null_dataspace()
+    }
+
+    /// Whether this dataset references external data files.
+    #[getter]
+    fn has_external_storage(&self) -> bool {
+        self.inner.has_external_storage()
     }
 
     fn chunk_index<'py>(&'py self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

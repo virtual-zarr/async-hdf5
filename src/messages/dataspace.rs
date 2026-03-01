@@ -10,6 +10,10 @@ use crate::error::Result;
 pub struct DataspaceMessage {
     /// Number of dimensions (0 = scalar).
     pub rank: u8,
+    /// Dataspace type: 0 = scalar, 1 = simple, 2 = null.
+    /// Only present for v2 messages; v1 defaults to 1 (simple) for rank > 0,
+    /// 0 (scalar) for rank == 0.
+    pub dataspace_type: u8,
     /// Current size along each dimension.
     pub dimensions: Vec<u64>,
     /// Maximum size along each dimension (None = same as current).
@@ -27,19 +31,21 @@ impl DataspaceMessage {
         let flags = r.read_u8()?;
 
         // v1: reserved (1 byte) + reserved (4 bytes) = 5 bytes (no type field)
-        // v2: type field (1 byte)
-        match version {
+        // v2: type field (1 byte): 0=scalar, 1=simple, 2=null
+        let dataspace_type = match version {
             1 => {
                 r.skip(5); // 1 reserved + 4 reserved
+                if rank == 0 { 0 } else { 1 }
             }
             2 => {
-                let _dataspace_type = r.read_u8()?;
+                r.read_u8()?
             }
             _ => {
                 // Best-effort: try to continue
-                r.skip(1);
+                
+                r.read_u8()?
             }
-        }
+        };
 
         let mut dimensions = Vec::with_capacity(rank as usize);
         for _ in 0..rank {
@@ -59,6 +65,7 @@ impl DataspaceMessage {
 
         Ok(Self {
             rank,
+            dataspace_type,
             dimensions,
             max_dimensions,
         })

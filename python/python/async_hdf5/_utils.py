@@ -47,6 +47,12 @@ def hdf5_filters_to_zarr_codecs(
                     "configuration": {"level": cd[0] if cd else 3},
                 }
             )
+        else:
+            name = f.get("name", f"unknown({fid})")
+            raise ValueError(
+                f"Unsupported HDF5 filter: {name} (id={fid}). "
+                "Use drop_variables to skip this dataset."
+            )
     return codecs
 
 

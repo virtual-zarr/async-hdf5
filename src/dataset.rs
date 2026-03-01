@@ -35,6 +35,7 @@ pub struct HDF5Dataset {
 
     // Parsed metadata (cached on construction)
     shape: Vec<u64>,
+    dataspace_type: u8,
     dtype: DataType,
     layout: StorageLayout,
     filters: FilterPipeline,
@@ -105,6 +106,7 @@ impl HDF5Dataset {
             raw_reader,
             superblock,
             shape: dataspace.dimensions,
+            dataspace_type: dataspace.dataspace_type,
             dtype,
             layout,
             filters,
@@ -159,6 +161,19 @@ impl HDF5Dataset {
     /// Storage layout.
     pub fn layout(&self) -> &StorageLayout {
         &self.layout
+    }
+
+    /// Whether this dataset has a null dataspace (no data, type 2).
+    pub fn is_null_dataspace(&self) -> bool {
+        self.dataspace_type == 2
+    }
+
+    /// Whether this dataset uses external data files (msg type 0x0007).
+    pub fn has_external_storage(&self) -> bool {
+        self.header
+            .messages
+            .iter()
+            .any(|m| m.msg_type == msg_types::EXTERNAL_DATA_FILES)
     }
 
     /// Access the object header.

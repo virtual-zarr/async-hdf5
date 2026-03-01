@@ -190,6 +190,25 @@ class _DatasetInfo:
         self._array_metadata: ArrayV3Metadata | None = None
         self._zarr_json_bytes: bytes | None = None
 
+        # --- Guards: fail loudly instead of producing silent wrong data ---
+
+        # Skip datasets with null dataspace (no data)
+        if ds.is_null_dataspace:
+            raise ValueError("Dataset has null dataspace (no data)")
+
+        # Skip datasets using external data files
+        if ds.has_external_storage:
+            raise ValueError(
+                "Dataset uses external data files (not supported). "
+                "Use drop_variables to skip this dataset."
+            )
+
+        # Validate numpy dtype is understood by numpy
+        np.dtype(self.numpy_dtype)
+
+        # Validate all HDF5 filters have a Zarr codec mapping
+        hdf5_filters_to_zarr_codecs(self.filters, self.element_size)
+
     @property
     def array_metadata(self) -> ArrayV3Metadata:
         if self._array_metadata is None:

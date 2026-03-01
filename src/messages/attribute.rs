@@ -272,6 +272,7 @@ impl AttributeMessage {
                     },
                     dataspace: DataspaceMessage {
                         rank: 0,
+                        dataspace_type: 0,
                         dimensions: vec![],
                         max_dimensions: None,
                     },
