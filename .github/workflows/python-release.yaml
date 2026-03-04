@@ -9,7 +9,7 @@ on:
   push:
     tags:
       - "py-v*"
-  pull_request:
+  # pull_request:
   workflow_dispatch:
 
 permissions:
@@ -156,6 +156,7 @@ jobs:
       url: https://pypi.org/p/async-hdf5
     permissions:
       id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@v6
         with:
