@@ -102,12 +102,29 @@ def generated_examples():
 _GENERATED_DIR = resolve_folder("tests/data/generated")
 
 
+_EXPECTED_FIXTURES = [
+    "contiguous_float32.h5",
+    "chunked_float64.h5",
+    "gzip_compressed.h5",
+    "multi_dtype.h5",
+    "nested_groups.h5",
+    "cf_style.h5",
+    "simple_1d.h5",
+    "multi_chunk.h5",
+    "unsigned_int.h5",
+    "superblock_v0.h5",
+    "fixed_array_paged.h5",
+]
+
+
 def _generate_fixtures():
     """Create small HDF5 files covering key parsing variations.
 
-    Files are only generated once; subsequent calls are no-ops.
+    Files are only regenerated when one or more expected fixtures are missing.
     """
-    if _GENERATED_DIR.exists() and any(_GENERATED_DIR.glob("*.h5")):
+    if _GENERATED_DIR.exists() and all(
+        (_GENERATED_DIR / f).exists() for f in _EXPECTED_FIXTURES
+    ):
         return
 
     _GENERATED_DIR.mkdir(parents=True, exist_ok=True)
@@ -213,6 +230,16 @@ def _generate_fixtures():
     # 10. Superblock v0 (libver='earliest')
     with h5py.File(_GENERATED_DIR / "superblock_v0.h5", "w", libver="earliest") as f:
         f.create_dataset("data", data=rng.random((10, 10), dtype=np.float32))
+
+    # 11. Fixed Array with paged data block (libver='latest' + many chunks)
+    # 2048 chunks with page_bits=10 → 2 pages of 1024 entries each.
+    # This tests the paged Fixed Array code path where the page init bitmap
+    # must be handled correctly.
+    with h5py.File(_GENERATED_DIR / "fixed_array_paged.h5", "w", libver="latest") as f:
+        data = np.arange(2048, dtype=np.float32)
+        f.create_dataset(
+            "data", data=data, chunks=(1,), compression="gzip", compression_opts=1
+        )
 
 
 # ---------------------------------------------------------------------------
