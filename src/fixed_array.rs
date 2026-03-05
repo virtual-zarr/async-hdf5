@@ -201,51 +201,35 @@ async fn read_paged_entries(
     let _client_id = r.read_u8()?;
     let _header_address = r.read_offset()?;
 
-    // Read bitmap
-    let bitmap_bytes = r.read_bytes(bitmap_size)?;
+    // Skip the page init bitmap (bitmap_size bytes). We always read all pages
+    // unconditionally — see comment below.
+    r.skip(bitmap_size as u64);
 
     // Pages follow immediately after the FADB (header + bitmap + checksum)
     let page_data_size = entries_per_page as u64 * header.entry_size as u64;
     let page_total_size = page_data_size + 4; // +4 checksum per page
     let pages_start = header.data_block_address + fadb_header_size + bitmap_size as u64 + 4;
 
+    // HDF5 allocates all pages sequentially after the FADB regardless of the
+    // page init bitmap. The bitmap is a write-tracking hint: a set bit means
+    // the page has been written to. However, some HDF5 writers don't set the
+    // bitmap correctly, so we always read every page. Truly unallocated chunks
+    // within a page still have UNDEF_ADDR, which callers filter out.
     let mut all_entries = Vec::with_capacity(num_entries);
     let mut page_file_offset = pages_start;
 
     for page_idx in 0..num_pages {
-        let byte_idx = page_idx / 8;
-        let bit_idx = page_idx % 8;
-        let page_allocated = (bitmap_bytes[byte_idx] >> bit_idx) & 1 != 0;
-
-        if !page_allocated {
-            // Unallocated page — fill with undefined entries
-            let entries_in_page = if page_idx == num_pages - 1 {
-                num_entries - page_idx * entries_per_page
-            } else {
-                entries_per_page
-            };
-            for _ in 0..entries_in_page {
-                all_entries.push(FixedArrayChunkEntry {
-                    address: u64::MAX, // undefined
-                    chunk_size: 0,
-                    filter_mask: 0,
-                });
-            }
-            // Don't advance file offset — unallocated pages have no storage
-            continue;
-        }
+        let entries_in_page = if page_idx == num_pages - 1 {
+            num_entries - page_idx * entries_per_page
+        } else {
+            entries_per_page
+        };
 
         // Read this page
         let page_data = reader
             .get_bytes(page_file_offset..page_file_offset + page_total_size)
             .await?;
         let mut pr = HDF5Reader::with_sizes(page_data, size_of_offsets, size_of_lengths);
-
-        let entries_in_page = if page_idx == num_pages - 1 {
-            num_entries - page_idx * entries_per_page
-        } else {
-            entries_per_page
-        };
 
         let page_entries = parse_entries(
             &mut pr,
