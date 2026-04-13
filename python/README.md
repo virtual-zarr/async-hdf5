@@ -120,7 +120,7 @@ from async_hdf5.store import S3Store
 
 s3 = S3Store(bucket="noaa-goes16", region="us-east-1", skip_signature=True)
 ds = xr.open_dataset(
-    "ABI-L2-MCMIPF/2024/099/18/file.nc",
+    "ABI-L2-MCMIPF/2024/099/18/OR_ABI-L2-MCMIPF-M6_G16_s20240991800204_e20240991809524_c20240991810005.nc",
     engine="async_hdf5",
     store=s3,
 )
