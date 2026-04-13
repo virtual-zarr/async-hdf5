@@ -1,17 +1,17 @@
 site_name: async-hdf5
-repo_name: maxrjones/async-hdf5
-repo_url: https://github.com/maxrjones/async-hdf5
+repo_name: virtual-zarr/async-hdf5
+repo_url: https://github.com/virtual-zarr/async-hdf5
 site_description: Asynchronous HDF5 metadata reader for Python. Read HDF5 from local disk or cloud storage without libhdf5.
 site_author: Max Jones
 # Note: trailing slash recommended with mike:
 # https://squidfunk.github.io/mkdocs-material/setup/setting-up-versioning/#publishing-a-new-version
-site_url: https://maxrjones.github.io/async-hdf5/
+site_url: https://virtual-zarr.github.io/async-hdf5/
 docs_dir: docs
 
 extra:
   social:
     - icon: "fontawesome/brands/github"
-      link: "https://github.com/maxrjones"
+      link: "https://github.com/virtual-zarr"
   version:
     alias: true
     provider: mike

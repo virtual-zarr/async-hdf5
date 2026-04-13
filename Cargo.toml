@@ -5,8 +5,8 @@ edition = "2021"
 authors = ["Max Jones"]
 license = "MIT"
 description = "Asynchronous HDF5 metadata reader."
-repository = "https://github.com/maxrjones/async-hdf5"
-documentation = "https://maxrjones.github.io/async-hdf5/"
+repository = "https://github.com/virtual-zarr/async-hdf5"
+documentation = "https://virtual-zarr.github.io/async-hdf5/"
 readme = "README.md"
 
 [dependencies]
