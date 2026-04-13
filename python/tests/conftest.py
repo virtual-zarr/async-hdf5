@@ -263,7 +263,10 @@ async def h5py_comparison(filepath: str, group: str | None = None):
         store=store,
         group=group,
     )
-    ds = xr.open_dataset(hdf5_store, engine="zarr", consolidated=False, zarr_format=3)
+    ds = xr.open_dataset(
+        hdf5_store, engine="zarr", consolidated=False, zarr_format=3,
+        mask_and_scale=False, decode_times=False,
+    )
 
     with h5py.File(filepath, "r") as f:
         target = f[group] if group else f
@@ -334,7 +337,10 @@ async def metadata_only_check(filepath: str, group: str | None = None):
         store=store,
         group=group,
     )
-    ds = xr.open_dataset(hdf5_store, engine="zarr", consolidated=False, zarr_format=3)
+    ds = xr.open_dataset(
+        hdf5_store, engine="zarr", consolidated=False, zarr_format=3,
+        mask_and_scale=False, decode_times=False,
+    )
 
     with h5py.File(filepath, "r") as f:
         target = f[group] if group else f

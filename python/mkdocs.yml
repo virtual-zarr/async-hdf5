@@ -18,6 +18,8 @@ extra:
 
 nav:
   - "index.md"
+  - Design:
+      - design/fill-values.md
   - API Reference:
       - api/file.md
       - api/group.md

@@ -164,6 +164,7 @@ class _DatasetInfo:
         "fill_value",
         "filters",
         "dimension_names",
+        "attributes",
         "hdf5_dataset",
         "_array_metadata",
         "_zarr_json_bytes",
@@ -186,6 +187,7 @@ class _DatasetInfo:
         )
         self.filters: list[dict[str, Any]] = ds.filters
         self.dimension_names = dimension_names
+        self.attributes: dict[str, Any] = {}
         self.hdf5_dataset: HDF5Dataset = ds
         self._array_metadata: ArrayV3Metadata | None = None
         self._zarr_json_bytes: bytes | None = None
@@ -231,6 +233,70 @@ class _DatasetInfo:
         )
 
 
+def _consolidate_fill_value(
+    attrs: dict[str, Any], fill_value: int | float | None, dtype: np.dtype,
+) -> tuple[dict[str, Any], int | float | None]:
+    """Consolidate HDF5 fill value into Zarr array attributes for xarray.
+
+    HDF5 datasets carry a typed fill value in the dataset header (already
+    decoded into ``fill_value``) and may also have ``_FillValue`` and/or
+    ``missing_value`` attributes.  This function:
+
+    1. Uses the HDF5 header fill value as the authoritative Zarr fill_value.
+    2. Encodes ``_FillValue`` in the format xarray's ``FillValueCoder``
+       expects (base64 for floats, plain int for integers, etc.).
+    3. Keeps ``missing_value`` as a plain Python numeric.
+    4. If the attributes contain ``_FillValue`` or ``missing_value`` but
+       no header fill value, parses them as the Zarr fill_value.
+
+    Parameters
+    ----------
+    attrs
+        Mutable dictionary of dataset attributes.
+    fill_value
+        Decoded fill value from the HDF5 dataset header, or None.
+    dtype
+        The numpy dtype of the dataset.
+
+    Returns
+    -------
+    attrs
+        Cleaned-up attributes with properly encoded ``_FillValue``.
+    fill_value
+        Scalar to use as the Zarr ``fill_value``, or None if no fill
+        value was found.
+    """
+    from async_hdf5.vendor.xarray.zarr import FillValueCoder
+
+    # Encode _FillValue for xarray's FillValueCoder (base64 for floats, etc.)
+    # The _FillValue attribute is the CF convention's missing-data sentinel.
+    # It must be encoded in the format xarray expects (base64 for floats)
+    # but does NOT override the Zarr fill_value, which comes from the HDF5
+    # dataset header and controls what zarr returns for uninitialized chunks.
+    if "_FillValue" in attrs:
+        v = attrs["_FillValue"]
+        if isinstance(v, (int, float, np.integer, np.floating)):
+            try:
+                typed_v = dtype.type(v).item()
+            except (OverflowError, ValueError):
+                warnings.warn(
+                    f"_FillValue {v!r} cannot be represented as {dtype}: "
+                    f"dropping attribute.",
+                    stacklevel=3,
+                )
+                del attrs["_FillValue"]
+            else:
+                attrs["_FillValue"] = FillValueCoder.encode(typed_v, dtype)
+
+    # missing_value must be a plain Python numeric (xarray passes it through as-is)
+    if "missing_value" in attrs:
+        mv = attrs["missing_value"]
+        if hasattr(mv, "item"):
+            attrs["missing_value"] = mv.item()
+
+    return attrs, fill_value
+
+
 def _create_array_metadata(info: _DatasetInfo) -> ArrayV3Metadata:
     """Build Zarr v3 array metadata from cached dataset info."""
     from zarr.dtype import parse_data_type
@@ -246,6 +312,11 @@ def _create_array_metadata(info: _DatasetInfo) -> ArrayV3Metadata:
         *codecs_config,
     ]
 
+    # Consolidate fill value from HDF5 header and attributes for xarray compat
+    attrs, fill_value = _consolidate_fill_value(
+        dict(info.attributes), info.fill_value, dt,
+    )
+
     return ArrayV3Metadata(
         shape=info.shape,
         data_type=zdtype,
@@ -255,10 +326,10 @@ def _create_array_metadata(info: _DatasetInfo) -> ArrayV3Metadata:
         },
         chunk_key_encoding={"name": "default"},
         fill_value=(
-            zdtype.default_scalar() if info.fill_value is None else info.fill_value
+            zdtype.default_scalar() if fill_value is None else fill_value
         ),
         codecs=codecs,
-        attributes={},
+        attributes=_sanitize_attrs(attrs),
         dimension_names=info.dimension_names,
         storage_transformers=None,
     )
@@ -729,6 +800,10 @@ async def open_hdf5(
             f"Use drop_variables to suppress this warning.",
             stacklevel=2,
         )
+
+    # Load dataset attributes (async) — needed for _FillValue, scale_factor, etc.
+    for _, info in dataset_infos.items():
+        info.attributes = await info.hdf5_dataset.attributes()
 
     # Get group attributes
     group_attrs = await target.attributes()
